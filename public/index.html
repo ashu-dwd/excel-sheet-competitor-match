@@ -48,6 +48,12 @@
         background-color: #f0f0f0;
       }
 
+      .upload-area.uploading {
+        border-color: #000000;
+        background-color: #f9f9f9;
+        opacity: 0.7;
+      }
+
       .toast {
         position: fixed;
         bottom: 20px;
@@ -59,6 +65,7 @@
         transform: translateY(20px);
         transition: all 0.3s ease;
         z-index: 1000;
+        max-width: 400px;
       }
 
       .toast.show {
@@ -78,17 +85,102 @@
         position: absolute;
         left: -9999px;
       }
+
+      .spinner {
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid #000000;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .notice-board {
+        border-left: 4px solid #000000;
+      }
     </style>
   </head>
   <body class="min-h-screen py-8 px-4">
     <div class="max-w-4xl mx-auto">
       <!-- Header -->
-      <header class="mb-10 p-6 bg-white rounded-lg shadow-sm">
+      <header class="mb-8 p-6 bg-white rounded-lg shadow-sm">
         <h1 class="text-2xl font-bold text-black">
           Excel Processing Dashboard
         </h1>
         <p class="text-gray-600">Upload and process your Excel files</p>
       </header>
+
+      <!-- Notice Board -->
+      <div class="notice-board bg-white rounded-lg shadow-sm p-6 mb-8">
+        <h2 class="text-lg font-semibold text-black mb-4 flex items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 mr-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          Important Instructions
+        </h2>
+        <div class="space-y-3 text-sm text-gray-700">
+          <div class="flex items-start">
+            <span class="font-semibold text-black mr-2">1.</span>
+            <span
+              ><strong>Email is required</strong> - You must provide your email
+              to receive notifications about file completion.</span
+            >
+          </div>
+          <div class="flex items-start">
+            <span class="font-semibold text-black mr-2">2.</span>
+            <span
+              ><strong>Check spam folder</strong> - If you don't receive
+              notifications, please check your spam/junk folder.</span
+            >
+          </div>
+          <div class="flex items-start">
+            <span class="font-semibold text-black mr-2">3.</span>
+            <span
+              ><strong>Processing time</strong> - It takes approximately 10
+              seconds to process each row, so calculate timing
+              accordingly.</span
+            >
+          </div>
+          <div class="flex items-start">
+            <span class="font-semibold text-black mr-2">4.</span>
+            <span
+              ><strong>Download links</strong> - All download links will be
+              shared via email once processing is complete.</span
+            >
+          </div>
+          <div class="flex items-start">
+            <span class="font-semibold text-black mr-2">5.</span>
+            <span
+              ><strong>Column naming</strong> - Make sure your first column is
+              named
+              <code class="bg-gray-100 px-1 rounded">client_site</code> and
+              second column as
+              <code class="bg-gray-100 px-1 rounded">competitors_site</code>.
+              The status column will contain the tool's output.</span
+            >
+          </div>
+        </div>
+      </div>
 
       <div class="grid grid-cols-1 gap-8">
         <!-- Upload Section -->
@@ -104,6 +196,7 @@
             <div class="flex flex-col items-center justify-center space-y-4">
               <div
                 class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center"
+                id="uploadIcon"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -111,6 +204,7 @@
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
+                  id="uploadSvg"
                 >
                   <path
                     stroke-linecap="round"
@@ -120,7 +214,7 @@
                   />
                 </svg>
               </div>
-              <div>
+              <div id="uploadText">
                 <p class="font-medium">Drag & Drop your file here</p>
                 <p class="text-sm text-gray-500 mt-1">
                   Supported format: .xlsx, .xls
@@ -145,21 +239,26 @@
             <label
               for="userEmail"
               class="block text-sm font-medium text-gray-700 mb-1"
-              >Email for notifications (Recommended)</label
+              >Email for notifications
+              <span class="text-red-500">*</span></label
             >
             <input
               type="email"
               id="userEmail"
               placeholder="your@email.com"
+              required
               class="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
             />
+            <p class="text-xs text-gray-500 mt-1">
+              Required for receiving completion notifications and download links
+            </p>
           </div>
 
           <button
             id="uploadBtn"
-            class="w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition"
+            class="w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Process File
+            <span id="uploadBtnText">Process File</span>
           </button>
         </div>
       </div>
@@ -179,38 +278,42 @@
         const browseBtn = document.getElementById("browseBtn");
         const fileUpload = document.getElementById("fileUpload");
         const uploadBtn = document.getElementById("uploadBtn");
-        const fileList = document.getElementById("fileList");
-        const noFilesMessage = document.getElementById("noFilesMessage");
+        const uploadBtnText = document.getElementById("uploadBtnText");
         const userEmailInput = document.getElementById("userEmail");
         const toast = document.getElementById("toast");
         const toastMessage = document.getElementById("toastMessage");
+        const uploadIcon = document.getElementById("uploadIcon");
+        const uploadText = document.getElementById("uploadText");
 
         // State variables
-        let files = JSON.parse(localStorage.getItem("excelFiles")) || [];
         let selectedFile = null;
+        let isUploading = false;
 
-        // Load saved email from localStorage if exists
+        // Load saved email if exists
         const savedEmail = localStorage.getItem("userEmail");
         if (savedEmail) {
           userEmailInput.value = savedEmail;
         }
 
-        // Initialize the dashboard
-        updateFileList();
-
         // Event Listeners
         browseBtn.addEventListener("click", (e) => {
-          e.stopPropagation(); // Prevent triggering dropZone click
-          fileUpload.click();
+          e.stopPropagation();
+          if (!isUploading) {
+            fileUpload.click();
+          }
         });
 
         dropZone.addEventListener("click", () => {
-          fileUpload.click();
+          if (!isUploading) {
+            fileUpload.click();
+          }
         });
 
         dropZone.addEventListener("dragover", (e) => {
           e.preventDefault();
-          dropZone.classList.add("dragover");
+          if (!isUploading) {
+            dropZone.classList.add("dragover");
+          }
         });
 
         dropZone.addEventListener("dragleave", () => {
@@ -221,13 +324,13 @@
           e.preventDefault();
           dropZone.classList.remove("dragover");
 
-          if (e.dataTransfer.files.length) {
+          if (!isUploading && e.dataTransfer.files.length) {
             handleFileSelection(e.dataTransfer.files[0]);
           }
         });
 
         fileUpload.addEventListener("change", (e) => {
-          if (e.target.files.length) {
+          if (!isUploading && e.target.files.length) {
             handleFileSelection(e.target.files[0]);
           }
         });
@@ -235,7 +338,7 @@
         uploadBtn.addEventListener("click", processFile);
 
         // Save email when user types
-        userEmailInput.addEventListener("change", () => {
+        userEmailInput.addEventListener("input", () => {
           localStorage.setItem("userEmail", userEmailInput.value);
         });
 
@@ -245,12 +348,53 @@
         // Functions
         function handleFileSelection(file) {
           if (!file.name.match(/\.(xlsx|xls)$/i)) {
-            showToast("Please select an Excel file", "error");
+            showToast("Please select an Excel file (.xlsx or .xls)", "error");
             return;
           }
 
           selectedFile = file;
-          showToast(`Selected file: ${file.name}`, "success");
+
+          // Update UI to show selected file
+          uploadText.innerHTML = `
+            <p class="font-medium text-black">File Selected: ${file.name}</p>
+            <p class="text-sm text-gray-500 mt-1">${formatFileSize(
+              file.size
+            )}</p>
+          `;
+
+          showToast(`File selected: ${file.name}`, "success");
+        }
+
+        function setUploadingState(uploading) {
+          isUploading = uploading;
+
+          if (uploading) {
+            // Show loading state
+            uploadIcon.innerHTML = '<div class="spinner"></div>';
+            uploadText.innerHTML = `
+              <p class="font-medium text-black">Uploading file...</p>
+              <p class="text-sm text-gray-500 mt-1">Please wait while we process your file</p>
+            `;
+            uploadBtnText.textContent = "Processing...";
+            uploadBtn.disabled = true;
+            dropZone.classList.add("uploading");
+            browseBtn.style.display = "none";
+          } else {
+            // Reset to default state
+            uploadIcon.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            `;
+            uploadText.innerHTML = `
+              <p class="font-medium">Drag & Drop your file here</p>
+              <p class="text-sm text-gray-500 mt-1">Supported format: .xlsx, .xls</p>
+            `;
+            uploadBtnText.textContent = "Process File";
+            uploadBtn.disabled = false;
+            dropZone.classList.remove("uploading");
+            browseBtn.style.display = "block";
+          }
         }
 
         async function processFile() {
@@ -259,38 +403,30 @@
             return;
           }
 
-          const file = selectedFile;
-          const email = userEmailInput.value;
-
-          // Save email to localStorage
-          if (email) {
-            localStorage.setItem("userEmail", email);
+          const email = userEmailInput.value.trim();
+          if (!email) {
+            showToast("Email is required for notifications", "error");
+            userEmailInput.focus();
+            return;
           }
 
-          // Create file object
-          const fileData = {
-            id: Date.now().toString(),
-            name: file.name,
-            uploadDate: new Date().toISOString(),
-            status: "pending",
-            email: email,
-            size: file.size,
-          };
+          if (!isValidEmail(email)) {
+            showToast("Please enter a valid email address", "error");
+            userEmailInput.focus();
+            return;
+          }
 
-          // Add to files array
-          files.unshift(fileData);
+          const file = selectedFile;
 
-          // Save to localStorage
-          localStorage.setItem("excelFiles", JSON.stringify(files));
+          // Save email
+          localStorage.setItem("userEmail", email);
 
-          // Update UI
-          updateFileList();
+          // Set uploading state
+          setUploadingState(true);
 
           const formData = new FormData();
           formData.append("excelFile", file);
-          if (email) {
-            formData.append("email", email);
-          }
+          formData.append("email", email);
 
           try {
             const response = await fetch(`${BACKEND_URL}/upload`, {
@@ -299,119 +435,35 @@
             });
 
             if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
+              const errorText = await response.text();
+              throw new Error(
+                `Upload failed: ${response.status} ${response.statusText}. ${errorText}`
+              );
             }
 
             const result = await response.json();
-            fileData.id = result.jobId; // Assuming the API returns a jobId
-            fileData.status = "pending"; // Initial status from backend
 
-            showToast("File uploaded and processing started", "success");
-          } catch (error) {
-            console.error("Upload failed:", error);
-            showToast(`Upload failed: ${error.message}`, "error");
-            // Remove the file from local storage if upload failed
-            files = files.filter((f) => f.id !== fileData.id);
-          } finally {
+            showToast(
+              "File uploaded successfully! You will receive an email notification when processing is complete.",
+              "success"
+            );
+
             // Clear the file selection
             selectedFile = null;
             fileUpload.value = "";
-            localStorage.setItem("excelFiles", JSON.stringify(files));
-            updateFileList();
-          }
-        }
 
-        async function updateFileList() {
-          // Clear the file list
-          fileList.innerHTML = "";
-          noFilesMessage.classList.remove("hidden"); // Show "No files uploaded yet" by default
-
-          try {
-            const response = await fetch(`${BACKEND_URL}/status`);
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const jobStatuses = await response.json();
-
-            if (jobStatuses.length > 0) {
-              noFilesMessage.classList.add("hidden"); // Hide if there are files
-              jobStatuses.forEach((job) => {
-                const row = document.createElement("tr");
-                row.className = "file-item border-b border-gray-100";
-                row.innerHTML = `
-                  <td class="py-4">
-                    <div class="flex items-center">
-                      <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center mr-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <div class="font-medium">${job.fileName}</div>
-                        <div class="text-xs text-gray-500">${formatFileSize(
-                          job.fileSize || 0
-                        )}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-4">
-                    <div class="text-sm">${formatDate(job.uploadDate)}</div>
-                  </td>
-                  <td class="py-4">
-                    ${getStatusBadge(job.status)}
-                  </td>
-                  <td class="py-4 text-right">
-                    ${
-                      job.status === "completed"
-                        ? `
-                    <button class="px-3 py-1 bg-black text-white rounded text-sm mr-2" onclick="downloadFile('${job.jobId}')">
-                      Download
-                    </button>
-                    `
-                        : ""
-                    }
-                  </td>
-                `;
-                fileList.appendChild(row);
-              });
-            }
+            // Refresh file list
+            setTimeout(() => {
+              updateFileList();
+            }, 1000);
           } catch (error) {
-            console.error("Failed to fetch file statuses:", error);
-            showToast("Failed to load file history.", "error");
-          }
-        }
-
-        async function downloadFile(jobId) {
-          try {
-            const response = await fetch(
-              `${BACKEND_URL}/download/${jobId}/excel`
+            console.error("Upload failed:", error);
+            showToast(
+              error.message || "Upload failed. Please try again.",
+              "error"
             );
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const blob = await response.blob();
-            const disposition = response.headers.get("Content-Disposition");
-            let filename = "download.xlsx";
-            if (disposition && disposition.indexOf("attachment") !== -1) {
-              const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-              const matches = filenameRegex.exec(disposition);
-              if (matches != null && matches) {
-                filename = matches.replace(/['"]/g, "");
-              }
-            }
-
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.style.display = "none";
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            showToast(`Downloading ${filename} completed`, "success");
-          } catch (error) {
-            console.error("Download failed:", error);
-            showToast(`Download failed: ${error.message}`, "error");
+          } finally {
+            setUploadingState(false);
           }
         }
 
@@ -421,22 +473,23 @@
 
           setTimeout(() => {
             toast.className = "toast";
-          }, 3000);
+          }, 5000);
         }
 
         function getStatusBadge(status) {
           const statusConfig = {
-            pending: { class: "bg-gray-200", text: "Pending" },
-            processing: { class: "bg-gray-300", text: "Processing" },
-            completed: { class: "bg-black", text: "Completed" },
-            failed: { class: "bg-gray-700", text: "Failed" },
+            pending: { class: "bg-gray-400 text-white", text: "Pending" },
+            processing: { class: "bg-gray-600 text-white", text: "Processing" },
+            completed: { class: "bg-black text-white", text: "Completed" },
+            failed: { class: "bg-gray-800 text-white", text: "Failed" },
           };
 
           const config = statusConfig[status] || statusConfig.pending;
-          return `<span class="px-2 py-1 rounded text-xs ${config.class} text-white">${config.text}</span>`;
+          return `<span class="px-2 py-1 rounded text-xs ${config.class}">${config.text}</span>`;
         }
 
         function formatDate(dateString) {
+          if (!dateString) return "Unknown";
           const date = new Date(dateString);
           return (
             date.toLocaleDateString() +
@@ -446,6 +499,7 @@
         }
 
         function formatFileSize(bytes) {
+          if (!bytes) return "Unknown size";
           if (bytes < 1024) return bytes + " bytes";
           else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
           else return (bytes / 1048576).toFixed(1) + " MB";
