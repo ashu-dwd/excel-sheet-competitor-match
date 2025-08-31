@@ -4,7 +4,7 @@ const { toBeRemovedCategories } = require("../constants/categories");
 // Configure Fuse.js for category matching
 const fuseOptions = {
   includeScore: true,
-  threshold: 0.5, // Adjust threshold for matching sensitivity (0 = exact, 1 = loose)
+  threshold: 0.8, // Adjust threshold for matching sensitivity (0 = exact, 1 = loose)
   minMatchCharLength: 4, // Minimum character length for matches
   keys: ["name"], // We'll use this to match category names
 };
