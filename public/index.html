@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Excel Processing Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#4361ee",
+              secondary: "#3f37c9",
+              success: "#4cc9f0",
+              danger: "#f72585",
+              warning: "#f8961e",
+              info: "#4895ef",
+              dark: "#1e1e2c",
+              light: "#f8f9fa",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+
+      body {
+        font-family: "Poppins", sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+      }
+
+      .card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+          0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      }
+
+      .progress-bar {
+        transition: width 1s ease-in-out;
+      }
+
+      .status-badge {
+        padding: 0.35rem 0.65rem;
+        border-radius: 50rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      .file-item {
+        transition: all 0.3s ease;
+      }
+
+      .file-item:hover {
+        background-color: #f1f5f9;
+      }
+
+      .upload-area {
+        border: 2px dashed #cbd5e1;
+        transition: all 0.3s ease;
+      }
+
+      .upload-area:hover,
+      .upload-area.dragover {
+        border-color: #4361ee;
+        background-color: #f0f4ff;
+      }
+
+      .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        color: white;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.3s ease;
+        z-index: 1000;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .toast.success {
+        background-color: #10b981;
+      }
+
+      .toast.error {
+        background-color: #ef4444;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen py-8 px-4">
+    <div class="max-w-6xl mx-auto">
+      <!-- Header -->
+      <header
+        class="flex flex-col md:flex-row justify-between items-center mb-10 p-6 bg-white rounded-xl shadow-lg"
+      >
+        <div class="mb-4 md:mb-0">
+          <h1 class="text-3xl font-bold text-primary">
+            <i class="fas fa-file-excel mr-3"></i>Excel Processing Dashboard
+          </h1>
+          <p class="text-gray-600">
+            Upload, process, and download your Excel files with ease
+          </p>
+        </div>
+        <div class="flex items-center space-x-4">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3">
+              <i class="fas fa-search text-gray-400"></i>
+            </div>
+            <input
+              type="text"
+              placeholder="Search files..."
+              class="pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+          <button
+            id="clearHistoryBtn"
+            class="bg-danger text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition"
+          >
+            <i class="fas fa-trash mr-2"></i>Clear History
+          </button>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Column - Upload Section -->
+        <div class="lg:col-span-1 space-y-8">
+          <!-- Upload Card -->
+          <div class="card bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold text-dark mb-4">
+              <i class="fas fa-cloud-upload-alt mr-2 text-primary"></i>Upload
+              Excel File
+            </h2>
+
+            <div
+              class="upload-area border-dashed border-2 rounded-xl p-6 text-center cursor-pointer mb-4"
+              id="dropZone"
+            >
+              <div class="flex flex-col items-center justify-center space-y-4">
+                <div
+                  class="w-16 h-16 rounded-full bg-primary bg-opacity-10 flex items-center justify-center"
+                >
+                  <i class="fas fa-file-excel text-3xl text-primary"></i>
+                </div>
+                <div>
+                  <p class="font-medium">Drag & Drop your file here</p>
+                  <p class="text-sm text-gray-500 mt-1">
+                    Supported format: .xlsx, .xls
+                  </p>
+                </div>
+                <label
+                  for="fileUpload"
+                  class="px-4 py-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-secondary transition"
+                >
+                  <i class="fas fa-folder-open mr-2"></i>Browse Files
+                </label>
+                <input
+                  type="file"
+                  id="fileUpload"
+                  accept=".xlsx,.xls"
+                  class="hidden"
+                />
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label
+                for="userEmail"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Email for notifications (optional)</label
+              >
+              <input
+                type="email"
+                id="userEmail"
+                placeholder="your@email.com"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+
+            <button
+              id="uploadBtn"
+              class="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-secondary transition flex items-center justify-center"
+            >
+              <i class="fas fa-paper-plane mr-2"></i>Process File
+            </button>
+
+            <div class="mt-6 bg-light rounded-lg p-4">
+              <h3 class="font-medium text-dark mb-2">
+                <i class="fas fa-info-circle mr-2 text-info"></i>How it works
+              </h3>
+              <ul class="text-sm text-gray-600 space-y-1">
+                <li>1. Upload your Excel file with website URLs</li>
+                <li>2. System processes and analyzes category data</li>
+                <li>3. Receive email notification when complete</li>
+                <li>4. Download processed results and logs</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Statistics Card -->
+          <div class="card bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold text-dark mb-4">
+              <i class="fas fa-chart-pie mr-2 text-primary"></i>Processing
+              Statistics
+            </h2>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div class="bg-primary bg-opacity-10 p-4 rounded-lg text-center">
+                <div class="text-3xl font-bold text-primary" id="totalFiles">
+                  0
+                </div>
+                <div class="text-sm text-gray-600">Total Files</div>
+              </div>
+              <div class="bg-success bg-opacity-10 p-4 rounded-lg text-center">
+                <div
+                  class="text-3xl font-bold text-success"
+                  id="processedFiles"
+                >
+                  0
+                </div>
+                <div class="text-sm text-gray-600">Processed</div>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-sm font-medium text-gray-700"
+                    >Success Rate</span
+                  >
+                  <span
+                    class="text-sm font-medium text-gray-700"
+                    id="successRate"
+                    >0%</span
+                  >
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                  <div
+                    class="bg-success h-2.5 rounded-full progress-bar"
+                    style="width: 0%"
+                  ></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-sm font-medium text-gray-700"
+                    >Avg. Processing Time</span
+                  >
+                  <span class="text-sm font-medium text-gray-700" id="avgTime"
+                    >0s</span
+                  >
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                  <div
+                    class="bg-primary h-2.5 rounded-full progress-bar"
+                    style="width: 0%"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column - File Status -->
+        <div class="lg:col-span-2">
+          <div class="card bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+              <h2 class="text-xl font-semibold text-dark">
+                <i class="fas fa-history mr-2 text-primary"></i>File Processing
+                History
+              </h2>
+              <div class="flex space-x-2">
+                <button
+                  id="refreshBtn"
+                  class="px-3 py-2 bg-light rounded-lg text-gray-600 hover:bg-gray-200 transition"
+                >
+                  <i class="fas fa-sync-alt"></i>
+                </button>
+                <div class="relative">
+                  <button
+                    id="filterBtn"
+                    class="px-3 py-2 bg-light rounded-lg text-gray-600 hover:bg-gray-200 transition"
+                  >
+                    <i class="fas fa-filter"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead>
+                  <tr class="text-left border-b border-gray-200">
+                    <th class="pb-3 text-gray-600">Filename</th>
+                    <th class="pb-3 text-gray-600">Uploaded</th>
+                    <th class="pb-3 text-gray-600">Status</th>
+                    <th class="pb-3 text-gray-600 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="fileList">
+                  <!-- Files will be dynamically added here -->
+                  <tr>
+                    <td
+                      colspan="4"
+                      class="py-8 text-center text-gray-500"
+                      id="noFilesMessage"
+                    >
+                      <i class="fas fa-inbox text-4xl mb-3 opacity-50"></i>
+                      <p>No files uploaded yet</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mt-6 flex justify-between items-center">
+              <div class="text-sm text-gray-500" id="showingText">
+                Showing 0 of 0 files
+              </div>
+              <div class="flex space-x-2">
+                <button
+                  class="px-3 py-1 rounded-lg bg-gray-200 text-gray-600 disabled:opacity-50"
+                  id="prevBtn"
+                  disabled
+                >
+                  <i class="fas fa-chevron-left"></i>
+                </button>
+                <button
+                  class="px-3 py-1 rounded-lg bg-gray-200 text-gray-600 disabled:opacity-50"
+                  id="nextBtn"
+                  disabled
+                >
+                  <i class="fas fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- File Details Modal (will be shown when a file is clicked) -->
+          <div
+            id="fileDetailModal"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden"
+          >
+            <div
+              class="bg-white rounded-xl shadow-2xl w-11/12 md:w-3/4 lg:w-2/3 max-h-[90vh] overflow-y-auto"
+            >
+              <div
+                class="p-6 border-b border-gray-200 flex justify-between items-center"
+              >
+                <h3 class="text-xl font-semibold text-dark">File Details</h3>
+                <button
+                  id="closeModalBtn"
+                  class="text-gray-400 hover:text-gray-600"
+                >
+                  <i class="fas fa-times text-xl"></i>
+                </button>
+              </div>
+              <div class="p-6" id="modalContent">
+                <!-- Modal content will be dynamically added here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+      <div class="flex items-center">
+        <i class="fas fa-check-circle mr-2"></i>
+        <span id="toastMessage"></span>
+      </div>
+    </div>
+
+    <script>
+      // API Base URL - Update this to match your server URL
+      const API_BASE_URL = "http://localhost:8080";
+
+      document.addEventListener("DOMContentLoaded", function () {
+        // DOM Elements
+        const dropZone = document.getElementById("dropZone");
+        const fileUpload = document.getElementById("fileUpload");
+        const uploadBtn = document.getElementById("uploadBtn");
+        const fileList = document.getElementById("fileList");
+        const noFilesMessage = document.getElementById("noFilesMessage");
+        const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+        const refreshBtn = document.getElementById("refreshBtn");
+        const fileDetailModal = document.getElementById("fileDetailModal");
+        const closeModalBtn = document.getElementById("closeModalBtn");
+        const modalContent = document.getElementById("modalContent");
+        const toast = document.getElementById("toast");
+        const toastMessage = document.getElementById("toastMessage");
+
+        // Statistics elements
+        const totalFilesEl = document.getElementById("totalFiles");
+        const processedFilesEl = document.getElementById("processedFiles");
+        const successRateEl = document.getElementById("successRate");
+        const avgTimeEl = document.getElementById("avgTime");
+        const showingTextEl = document.getElementById("showingText");
+
+        // State variables
+        let files = JSON.parse(localStorage.getItem("excelFiles")) || [];
+        let currentPage = 1;
+        const filesPerPage = 5;
+        let pollingIntervals = {};
+
+        // Initialize the dashboard
+        updateFileList();
+        updateStatistics();
+        startPollingForUpdates();
+
+        // Event Listeners
+        dropZone.addEventListener("click", () => fileUpload.click());
+
+        dropZone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          dropZone.classList.add("dragover");
+        });
+
+        dropZone.addEventListener("dragleave", () => {
+          dropZone.classList.remove("dragover");
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          dropZone.classList.remove("dragover");
+
+          if (e.dataTransfer.files.length) {
+            fileUpload.files = e.dataTransfer.files;
+            handleFileSelection(e.dataTransfer.files[0]);
+          }
+        });
+
+        fileUpload.addEventListener("change", (e) => {
+          if (e.target.files.length) {
+            handleFileSelection(e.target.files[0]);
+          }
+        });
+
+        uploadBtn.addEventListener("click", processFile);
+
+        clearHistoryBtn.addEventListener("click", clearHistory);
+
+        refreshBtn.addEventListener("click", () => {
+          updateFileList();
+          updateStatistics();
+          showToast("File list refreshed", "success");
+        });
+
+        closeModalBtn.addEventListener("click", () => {
+          fileDetailModal.classList.add("hidden");
+        });
+
+        // Functions
+        function handleFileSelection(file) {
+          if (!file.name.match(/\.(xlsx|xls)$/i)) {
+            showToast("Please select an Excel file", "error");
+            return;
+          }
+
+          showToast(`Selected file: ${file.name}`, "success");
+        }
+
+        async function processFile() {
+          if (!fileUpload.files.length) {
+            showToast("Please select a file first", "error");
+            return;
+          }
+
+          const file = fileUpload.files[0];
+          const email = document.getElementById("userEmail").value;
+
+          // Create FormData object to send the file
+          const formData = new FormData();
+          formData.append("excelFile", file);
+          if (email) {
+            formData.append("email", email);
+          }
+
+          try {
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML =
+              '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...';
+
+            // Send the file to the server
+            const response = await fetch(`${API_BASE_URL}/upload`, {
+              method: "POST",
+              body: formData,
+            });
+
+            if (!response.ok) {
+              throw new Error(`Upload failed: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            // Create file object
+            const fileData = {
+              id: data.jobId,
+              name: file.name,
+              uploadDate: new Date().toISOString(),
+              status: "pending",
+              email: email,
+              size: file.size,
+              progress: 0,
+            };
+
+            // Add to files array
+            files.unshift(fileData);
+
+            // Save to localStorage
+            localStorage.setItem("excelFiles", JSON.stringify(files));
+
+            // Update UI
+            updateFileList();
+            updateStatistics();
+
+            // Start polling for this job's status
+            startPollingJobStatus(data.jobId);
+
+            showToast("File uploaded and processing started", "success");
+
+            // Clear the file input
+            fileUpload.value = "";
+            document.getElementById("userEmail").value = "";
+          } catch (error) {
+            console.error("Upload error:", error);
+            showToast("Upload failed: " + error.message, "error");
+          } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML =
+              '<i class="fas fa-paper-plane mr-2"></i>Process File';
+          }
+        }
+
+        async function checkJobStatus(jobId) {
+          try {
+            const response = await fetch(`${API_BASE_URL}/status/${jobId}`);
+
+            if (!response.ok) {
+              throw new Error(`Status check failed: ${response.statusText}`);
+            }
+
+            const statusData = await response.json();
+
+            // Find the file in our array
+            const fileIndex = files.findIndex((f) => f.id === jobId);
+            if (fileIndex === -1) return;
+
+            // Update file status
+            files[fileIndex].status = statusData.status;
+
+            if (statusData.status === "completed") {
+              files[fileIndex].completedDate = new Date().toISOString();
+              files[fileIndex].progress = 100;
+              files[fileIndex].result = {
+                excelPath: statusData.excelPath,
+                successLog: statusData.successLog,
+                errorLog: statusData.errorLog,
+              };
+
+              // Stop polling for this job
+              stopPollingJobStatus(jobId);
+
+              showToast("File processing completed", "success");
+            } else if (statusData.status === "failed") {
+              files[fileIndex].error = statusData.error;
+              stopPollingJobStatus(jobId);
+              showToast("File processing failed", "error");
+            } else if (statusData.status === "processing") {
+              // Update progress (you might need to adjust this based on your API)
+              files[fileIndex].progress = Math.min(
+                files[fileIndex].progress + 10,
+                90
+              );
+            }
+
+            // Save to localStorage
+            localStorage.setItem("excelFiles", JSON.stringify(files));
+
+            // Update UI
+            updateFileListItem(jobId);
+            updateStatistics();
+          } catch (error) {
+            console.error("Status check error:", error);
+          }
+        }
+
+        function startPollingJobStatus(jobId) {
+          // Check immediately
+          checkJobStatus(jobId);
+
+          // Then set up interval for polling
+          pollingIntervals[jobId] = setInterval(() => {
+            checkJobStatus(jobId);
+          }, 5000); // Poll every 5 seconds
+        }
+
+        function stopPollingJobStatus(jobId) {
+          if (pollingIntervals[jobId]) {
+            clearInterval(pollingIntervals[jobId]);
+            delete pollingIntervals[jobId];
+          }
+        }
+
+        function startPollingForUpdates() {
+          // Poll all pending/processing jobs
+          files.forEach((file) => {
+            if (file.status === "pending" || file.status === "processing") {
+              startPollingJobStatus(file.id);
+            }
+          });
+        }
+
+        async function downloadFile(jobId, type) {
+          console.log(`Downloading ${type} for job ${jobId}`);
+          try {
+            const response = await fetch(
+              `${API_BASE_URL}/download/${jobId}/${type}`
+            );
+
+            if (!response.ok) {
+              throw new Error(`Download failed: ${response.statusText}`);
+            }
+
+            // Get filename from content-disposition header or generate one
+            const contentDisposition = response.headers.get(
+              "content-disposition"
+            );
+            let filename = `${jobId}_${type}`;
+
+            if (contentDisposition) {
+              const filenameMatch =
+                contentDisposition.match(/filename="?(.+)"?/);
+              if (filenameMatch.length > 1) {
+                filename = filenameMatch[1];
+              }
+            }
+
+            // Create blob from response
+            const blob = await response.blob();
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+
+            // Clean up
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            showToast("Download started", "success");
+          } catch (error) {
+            console.error("Download error:", error);
+            showToast("Download failed: " + error.message, "error");
+          }
+        }
+
+        function updateFileList() {
+          // Clear the file list
+          fileList.innerHTML = "";
+
+          if (files.length === 0) {
+            noFilesMessage.classList.remove("hidden");
+            return;
+          }
+
+          noFilesMessage.classList.add("hidden");
+
+          // Calculate pagination
+          const totalPages = Math.ceil(files.length / filesPerPage);
+          const startIndex = (currentPage - 1) * filesPerPage;
+          const endIndex = Math.min(startIndex + filesPerPage, files.length);
+
+          // Update showing text
+          showingTextEl.textContent = `Showing ${
+            startIndex + 1
+          }-${endIndex} of ${files.length} files`;
+
+          // Update pagination buttons
+          document.getElementById("prevBtn").disabled = currentPage === 1;
+          document.getElementById("nextBtn").disabled =
+            currentPage === totalPages;
+
+          // Add files to the list
+          for (let i = startIndex; i < endIndex; i++) {
+            const file = files[i];
+            const row = document.createElement("tr");
+            row.className = "file-item border-b border-gray-100";
+            row.innerHTML = `
+                        <td class="py-4">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-lg bg-primary bg-opacity-10 flex items-center justify-center mr-3">
+                                    <i class="fas fa-file-excel text-primary"></i>
+                                </div>
+                                <div>
+                                    <div class="font-medium">${file.name}</div>
+                                    <div class="text-xs text-gray-500">${formatFileSize(
+                                      file.size
+                                    )}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-4">
+                            <div class="text-sm">${formatDate(
+                              file.uploadDate
+                            )}</div>
+                        </td>
+                        <td class="py-4">
+                            ${getStatusBadge(file.status)}
+                            ${
+                              file.status === "processing"
+                                ? `
+                                <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                    <div class="bg-primary h-1.5 rounded-full progress-bar" style="width: ${file.progress}%"></div>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">${file.progress}% complete</div>
+                            `
+                                : ""
+                            }
+                        </td>
+                        <td class="py-4 text-right">
+                            ${
+                              file.status === "completed"
+                                ? `
+                                <button class="download-btn px-3 py-1 bg-success text-white rounded-lg text-sm mr-2" data-id="${file.id}" data-type="excel">
+                                    <i class="fas fa-download mr-1"></i>Excel
+                                </button>
+                                <button class="download-btn px-3 py-1 bg-info text-white rounded-lg text-sm mr-2" data-id="${file.id}" data-type="success">
+                                    <i class="fas fa-file-alt mr-1"></i>Logs
+                                </button>
+                            `
+                                : ""
+                            }
+                            <button class="details-btn px-3 py-1 bg-light rounded-lg text-sm" data-id="${
+                              file.id
+                            }">
+                                <i class="fas fa-info-circle mr-1"></i>Details
+                            </button>
+                        </td>
+                    `;
+            fileList.appendChild(row);
+          }
+
+          // Add event listeners to details buttons
+          document.querySelectorAll(".details-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const fileId = btn.getAttribute("data-id");
+              showFileDetails(fileId);
+            });
+          });
+
+          // Add event listeners to download buttons
+          document.querySelectorAll(".download-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const fileId = btn.getAttribute("data-id");
+              const type = btn.getAttribute("data-type");
+              downloadFile(fileId, type);
+            });
+          });
+        }
+
+        function updateFileListItem(fileId) {
+          const file = files.find((f) => f.id === fileId);
+          if (!file) return;
+
+          const item = document
+            .querySelector(`.details-btn[data-id="${fileId}"]`)
+            .closest("tr");
+          if (!item) return;
+
+          // Update status cell
+          const statusCell = item.children[2];
+          statusCell.innerHTML =
+            getStatusBadge(file.status) +
+            (file.status === "processing"
+              ? `
+                        <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                            <div class="bg-primary h-1.5 rounded-full progress-bar" style="width: ${file.progress}%"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">${file.progress}% complete</div>
+                    `
+              : "");
+
+          // Update actions cell
+          const actionsCell = item.children[3];
+          if (file.status === "completed") {
+            actionsCell.innerHTML = `
+                        <button class="download-btn px-3 py-1 bg-success text-white rounded-lg text-sm mr-2" data-id="${file.id}" data-type="excel">
+                            <i class="fas fa-download mr-1"></i>Excel
+                        </button>
+                        <button class="download-btn px-3 py-1 bg-info text-white rounded-lg text-sm mr-2" data-id="${file.id}" data-type="success">
+                            <i class="fas fa-file-alt mr-1"></i>Logs
+                        </button>
+                        <button class="details-btn px-3 py-1 bg-light rounded-lg text-sm" data-id="${file.id}">
+                            <i class="fas fa-info-circle mr-1"></i>Details
+                        </button>
+                    `;
+
+            // Add event listeners to the new download buttons
+            actionsCell.querySelectorAll(".download-btn").forEach((btn) => {
+              btn.addEventListener("click", () => {
+                const fileId = btn.getAttribute("data-id");
+                const type = btn.getAttribute("data-type");
+                downloadFile(fileId, type);
+              });
+            });
+
+            // Add event listener to the new details button
+            actionsCell
+              .querySelector(".details-btn")
+              .addEventListener("click", () => {
+                showFileDetails(file.id);
+              });
+          }
+        }
+
+        function showFileDetails(fileId) {
+          const file = files.find((f) => f.id === fileId);
+          if (!file) return;
+
+          modalContent.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-2">File Information</h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Filename:</span>
+                                    <span class="font-medium">${
+                                      file.name
+                                    }</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Uploaded:</span>
+                                    <span>${formatDate(file.uploadDate)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Size:</span>
+                                    <span>${formatFileSize(file.size)}</span>
+                                </div>
+                                ${
+                                  file.completedDate
+                                    ? `
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Completed:</span>
+                                    <span>${formatDate(
+                                      file.completedDate
+                                    )}</span>
+                                </div>
+                                `
+                                    : ""
+                                }
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Status:</span>
+                                    <span>${getStatusText(file.status)}</span>
+                                </div>
+                                ${
+                                  file.email
+                                    ? `
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Notification Email:</span>
+                                    <span>${file.email}</span>
+                                </div>
+                                `
+                                    : ""
+                                }
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium text-gray-700 mb-2">Actions</h4>
+                            <div class="space-y-3">
+                                ${
+                                  file.status === "completed"
+                                    ? `
+                                <button class="w-full bg-success text-white py-2 rounded-lg flex items-center justify-center download-modal-btn" data-type="excel">
+                                    <i class="fas fa-download mr-2"></i>Download Excel Results
+                                </button>
+                                <button class="w-full bg-info text-white py-2 rounded-lg flex items-center justify-center download-modal-btn" data-type="success">
+                                    <i class="fas fa-file-alt mr-2"></i>Download Success Log
+                                </button>
+                                <button class="w-full bg-warning text-white py-2 rounded-lg flex items-center justify-center download-modal-btn" data-type="error">
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>Download Error Log
+                                </button>
+                                `
+                                    : `
+                                <div class="text-center py-8">
+                                    <div class="inline-flex items-center justify-center w-16 h-16 bg-primary bg-opacity-10 rounded-full mb-4">
+                                        <i class="fas fa-cog fa-spin text-2xl text-primary"></i>
+                                    </div>
+                                    <p class="text-gray-600">File is currently being processed</p>
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+                                        <div class="bg-primary h-2.5 rounded-full progress-bar" style="width: ${file.progress}%"></div>
+                                    </div>
+                                    <div class="text-sm text-gray-500 mt-2">${file.progress}% complete</div>
+                                </div>
+                                `
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${
+                      file.status === "completed"
+                        ? `
+                    <div class="mt-8">
+                        <h4 class="font-medium text-gray-700 mb-4">Processing Results</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-success bg-opacity-10 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-success">${
+                                  Math.floor(Math.random() * 50) + 50
+                                }</div>
+                                <div class="text-sm text-gray-600">Successful Comparisons</div>
+                            </div>
+                            <div class="bg-primary bg-opacity-10 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-primary">${Math.floor(
+                                  Math.random() * 20
+                                )}</div>
+                                <div class="text-sm text-gray-600">Common Categories Found</div>
+                            </div>
+                            <div class="bg-warning bg-opacity-10 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-warning">${Math.floor(
+                                  Math.random() * 10
+                                )}</div>
+                                <div class="text-sm text-gray-600">Errors</div>
+                            </div>
+                        </div>
+                    </div>
+                    `
+                        : ""
+                    }
+                `;
+
+          // Add event listeners to download buttons in modal
+          document.querySelectorAll(".download-modal-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const type = btn.getAttribute("data-type");
+              downloadFile(fileId, type);
+            });
+          });
+
+          fileDetailModal.classList.remove("hidden");
+        }
+
+        function updateStatistics() {
+          totalFilesEl.textContent = files.length;
+
+          const completedFiles = files.filter(
+            (f) => f.status === "completed"
+          ).length;
+          processedFilesEl.textContent = completedFiles;
+
+          const successRate =
+            files.length > 0
+              ? Math.round((completedFiles / files.length) * 100)
+              : 0;
+          successRateEl.textContent = `${successRate}%`;
+          document.querySelectorAll(
+            ".progress-bar"
+          )[0].style.width = `${successRate}%`;
+        }
+
+        function clearHistory() {
+          if (
+            confirm(
+              "Are you sure you want to clear all file history? This action cannot be undone."
+            )
+          ) {
+            // Stop all polling intervals
+            Object.keys(pollingIntervals).forEach((jobId) => {
+              clearInterval(pollingIntervals[jobId]);
+            });
+            pollingIntervals = {};
+
+            files = [];
+            localStorage.removeItem("excelFiles");
+            updateFileList();
+            updateStatistics();
+            showToast("File history cleared", "success");
+          }
+        }
+
+        function showToast(message, type) {
+          toastMessage.textContent = message;
+          toast.className = `toast ${type} show`;
+
+          setTimeout(() => {
+            toast.className = "toast";
+          }, 3000);
+        }
+
+        function getStatusBadge(status) {
+          const statusConfig = {
+            pending: { class: "bg-info", text: "Pending", icon: "clock" },
+            processing: {
+              class: "bg-warning",
+              text: "Processing",
+              icon: "cog",
+            },
+            completed: {
+              class: "bg-success",
+              text: "Completed",
+              icon: "check",
+            },
+            failed: { class: "bg-danger", text: "Failed", icon: "exclamation" },
+          };
+
+          const config = statusConfig[status] || statusConfig.pending;
+          return `<span class="status-badge ${config.class} text-white"><i class="fas fa-${config.icon} mr-1"></i>${config.text}</span>`;
+        }
+
+        function getStatusText(status) {
+          const statusTexts = {
+            pending: "Pending",
+            processing: "Processing",
+            completed: "Completed",
+            failed: "Failed",
+          };
+
+          return statusTexts[status] || "Unknown";
+        }
+
+        function formatDate(dateString) {
+          const date = new Date(dateString);
+          return (
+            date.toLocaleDateString() +
+            " " +
+            date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          );
+        }
+
+        function formatFileSize(bytes) {
+          if (bytes < 1024) return bytes + " bytes";
+          else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+          else return (bytes / 1048576).toFixed(1) + " MB";
+        }
+
+        // Pagination event listeners
+        document.getElementById("prevBtn").addEventListener("click", () => {
+          if (currentPage > 1) {
+            currentPage--;
+            updateFileList();
+          }
+        });
+
+        document.getElementById("nextBtn").addEventListener("click", () => {
+          if (currentPage < Math.ceil(files.length / filesPerPage)) {
+            currentPage++;
+            updateFileList();
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
