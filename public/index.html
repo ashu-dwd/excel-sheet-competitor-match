@@ -451,11 +451,6 @@
             // Clear the file selection
             selectedFile = null;
             fileUpload.value = "";
-
-            // Refresh file list
-            setTimeout(() => {
-              updateFileList();
-            }, 1000);
           } catch (error) {
             console.error("Upload failed:", error);
             showToast(
@@ -465,6 +460,52 @@
           } finally {
             setUploadingState(false);
           }
+        }
+
+        async function downloadFile(jobId) {
+          try {
+            const response = await fetch(
+              `${BACKEND_URL}/download/${jobId}/excel`
+            );
+
+            if (!response.ok) {
+              throw new Error(
+                `Download failed: ${response.status} ${response.statusText}`
+              );
+            }
+
+            const blob = await response.blob();
+            const disposition = response.headers.get("Content-Disposition");
+            let filename = "processed_file.xlsx";
+
+            if (disposition && disposition.indexOf("attachment") !== -1) {
+              const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+              const matches = filenameRegex.exec(disposition);
+              if (matches != null && matches[1]) {
+                filename = matches[1].replace(/['"]/g, "");
+              }
+            }
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            showToast(`Download completed: ${filename}`, "success");
+          } catch (error) {
+            console.error("Download failed:", error);
+            showToast(`Download failed: ${error.message}`, "error");
+          }
+        }
+
+        function isValidEmail(email) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          return emailRegex.test(email);
         }
 
         function showToast(message, type) {
@@ -504,6 +545,11 @@
           else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
           else return (bytes / 1048576).toFixed(1) + " MB";
         }
+
+        // Auto-refresh file list every 30 seconds
+        setInterval(() => {
+          updateFileList();
+        }, 30000);
 
         // Make downloadFile function available globally for onclick handlers
         window.downloadFile = downloadFile;
