@@ -431,7 +431,9 @@
 
         async function downloadFile(jobId) {
           try {
-            const response = await fetch(`${BACKEND_URL}/download/${jobId}`);
+            const response = await fetch(
+              `${BACKEND_URL}/download/${jobId}/excel`
+            );
             if (!response.ok) {
               throw new Error(`HTTP error! status: ${response.status}`);
             }
