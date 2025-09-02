@@ -4,13 +4,13 @@ const path = require("path");
 const fs = require("fs");
 const { redisConnection } = require("../config/redis");
 const { setJobStatus } = require("../services/jobStatusService");
-const { scrapeCategories } = require("../services/scrapingService");
-const {
-  findCommonCategoriesWithFuse,
-  filterRemovedCategories,
-} = require("../utils/categoryMatcher");
+const enhancedScraping = require("../services/enhancedScrapingService");
+const categoryMatcher = require("../utils/categoryMatcher");
 const { sendProcessingCompleteEmail } = require("../services/emailService");
 const { cleanupFile } = require("../services/fileService");
+
+// Batch size for concurrent processing
+const BATCH_SIZE = 5;
 
 const processExcelJob = async (job) => {
   const { jobId, filePath, userEmail } = job.data;
@@ -37,71 +37,22 @@ const processExcelJob = async (job) => {
   const successLogStream = fs.createWriteStream(successLogPath, { flags: "a" });
   const errorLogStream = fs.createWriteStream(errorLogPath, { flags: "a" });
 
-  for (const row of data) {
-    console.log(row);
-    const { client_site, competitors_site } = row;
-    let status = "FAIL";
-    let websiteCategories = [];
-    let competitorCategories = [];
-    let commonCategoriesDetails = [];
-    let similarityScore = 0;
+  // Process in batches for better performance
+  for (let i = 0; i < data.length; i += BATCH_SIZE) {
+    const batch = data.slice(i, i + BATCH_SIZE);
+    console.log(
+      `Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(
+        data.length / BATCH_SIZE
+      )}`
+    );
 
-    if (!client_site || !competitors_site) {
-      console.warn(
-        `Job ${jobId} - Skipping row due to missing client_site or competitors_site: ${JSON.stringify(
-          row
-        )}`
-      );
-      errorLogStream.write(
-        `Job ${jobId} - Skipping row due to missing client_site or competitors_site: ${JSON.stringify(
-          row
-        )}\n`
-      );
-      results.push({
-        ...row,
-        status: "SKIPPED",
-      });
-      continue;
-    }
-
-    try {
-      websiteCategories = await scrapeCategories(client_site);
-      competitorCategories = await scrapeCategories(competitors_site);
-
-      // Use Fuse.js for fuzzy matching
-      commonCategoriesDetails = findCommonCategoriesWithFuse(
-        websiteCategories,
-        competitorCategories
-      );
-
-      // Remove unwanted categories
-      commonCategoriesDetails = filterRemovedCategories(
-        commonCategoriesDetails
-      );
-
-      if (commonCategoriesDetails.length > 0) {
-        status = "PASS";
-        // Calculate average similarity score
-        similarityScore =
-          commonCategoriesDetails.reduce(
-            (sum, cat) => sum + (1 - cat.similarityScore),
-            0
-          ) / commonCategoriesDetails.length;
-      }
-
-      successLogStream.write(
-        `Job ${jobId} - Row processed: Client: ${client_site}, Competitor: ${competitors_site}, Status: ${status}, Common Categories: ${commonCategoriesDetails.length}\n`
-      );
-    } catch (error) {
-      errorLogStream.write(
-        `Job ${jobId} - Error processing row: Client: ${client_site}, Competitor: ${competitors_site}, Error: ${error.message}\n`
-      );
-    }
-
-    results.push({
-      ...row,
-      status,
-    });
+    const batchResults = await processBatch(
+      batch,
+      jobId,
+      successLogStream,
+      errorLogStream
+    );
+    results.push(...batchResults);
   }
 
   const newWorkbook = XLSX.utils.book_new();
@@ -139,6 +90,137 @@ const processExcelJob = async (job) => {
   }
 
   cleanupFile(filePath); // Clean up uploaded file
+};
+
+// Enhanced batch processing with concurrent scraping
+const processBatch = async (batch, jobId, successLogStream, errorLogStream) => {
+  const batchResults = [];
+  const scrapePromises = [];
+
+  // Collect all URLs to scrape concurrently
+  const allUrls = new Set();
+  batch.forEach((row) => {
+    if (row.client_site && row.client_site.trim()) {
+      allUrls.add(row.client_site.trim());
+    }
+    if (row.competitors_site && row.competitors_site.trim()) {
+      allUrls.add(row.competitors_site.trim());
+    }
+  });
+
+  console.log(`Scraping ${allUrls.size} unique URLs concurrently...`);
+
+  // First, scrape all unique URLs concurrently (with rate limiting through Promise.race)
+  let scrapeResults = {};
+  const urlArray = Array.from(allUrls);
+
+  for (let i = 0; i < urlArray.length; i += 5) {
+    // Process in chunks of 5
+    const chunk = urlArray.slice(i, i + 5);
+    const chunkPromises = chunk.map((url) =>
+      enhancedScraping.scrapeCategories(url)
+    );
+
+    const chunkResults = await Promise.allSettled(chunkPromises);
+
+    chunk.forEach((url, index) => {
+      if (chunkResults[index].status === "fulfilled") {
+        scrapeResults[url] = chunkResults[index].value;
+      } else {
+        console.error(
+          `Failed to scrape ${url}:`,
+          chunkResults[index].reason.message
+        );
+        scrapeResults[url] = []; // Empty array on failure
+      }
+    });
+  }
+
+  // Now process each row using the scraped data
+  for (const row of batch) {
+    const { client_site, competitors_site } = row;
+    let status = "FAIL";
+    let similarityScore = 0;
+    let confidence = 0;
+    let matchingDetails = {};
+
+    if (!client_site || !competitors_site) {
+      console.warn(
+        `Job ${jobId} - Skipping row due to missing client_site or competitors_site: ${JSON.stringify(
+          row
+        )}`
+      );
+      errorLogStream.write(
+        `Job ${jobId} - Skipping row due to missing client_site or competitors_site: ${JSON.stringify(
+          row
+        )}\n`
+      );
+      batchResults.push({
+        ...row,
+        status: "SKIPPED",
+      });
+      continue;
+    }
+
+    try {
+      const websiteCategories = scrapeResults[client_site.trim()] || [];
+      const competitorCategories = scrapeResults[competitors_site.trim()] || [];
+
+      console.log(
+        `Categories found: ${websiteCategories.length} (${client_site}) vs ${competitorCategories.length} (${competitors_site})`
+      );
+
+      // Use enhanced category matching
+      const commonCategoriesDetails = categoryMatcher.findCommonCategories(
+        websiteCategories,
+        competitorCategories
+      );
+
+      // Determine similarity status with enhanced logic
+      const similarityResult = categoryMatcher.determineSimilarityStatus(
+        commonCategoriesDetails,
+        {
+          minMatches: 3,
+          minConfidence: 0.6,
+          minAverageSimilarity: 0.55,
+        }
+      );
+
+      status = similarityResult.status;
+      confidence = similarityResult.confidence;
+      similarityScore = confidence; // For backward compatibility
+
+      matchingDetails = {
+        totalMatches: commonCategoriesDetails.length,
+        highConfidenceMatches: commonCategoriesDetails.filter(
+          (m) => m.confidence >= 0.6
+        ).length,
+        averageConfidence: Math.round(confidence * 100) + "%",
+        reason: similarityResult.reason,
+      };
+
+      successLogStream.write(
+        `Job ${jobId} - Row processed: Client: ${client_site}, Competitor: ${competitors_site}, Status: ${status}, Confidence: ${(
+          confidence * 100
+        ).toFixed(1)}%, Matches: ${commonCategoriesDetails.length}\n`
+      );
+    } catch (error) {
+      console.error(`Error processing row:`, error.message);
+      errorLogStream.write(
+        `Job ${jobId} - Error processing row: Client: ${client_site}, Competitor: ${competitors_site}, Error: ${error.message}\n`
+      );
+    }
+
+    batchResults.push({
+      ...row,
+      status,
+      similarity_score: similarityScore,
+      confidence: confidence,
+      matching_details: JSON.stringify(matchingDetails),
+    });
+  }
+
+  return batchResults;
 };
 
 const worker = new Worker("excelProcessingQueue", processExcelJob, {

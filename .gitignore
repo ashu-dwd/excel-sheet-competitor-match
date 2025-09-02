@@ -5,3 +5,4 @@ results
 logs
 uploads
 .env
+.env.production
